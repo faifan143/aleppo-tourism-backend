@@ -13,47 +13,25 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { CreateTourismPlaceDto, UpdateTourismPlaceDto } from './dto';
 import { TourismPlacesService } from './tourism-places.service';
+import { fileUploadConfig } from '../shared/file-upload.utils';
 
 @Controller('tourism-places')
 export class TourismPlacesController {
-  constructor(private readonly tourismPlacesService: TourismPlacesService) {}
+  constructor(private readonly tourismPlacesService: TourismPlacesService) { }
 
   // Create a new tourism place
   @Post('create')
-  @UseInterceptors(
-    FileInterceptor('coverImage', {
-      storage: diskStorage({
-        destination: './public/uploads/photos',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-        if (allowedMimeTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(
-            new HttpException(
-              'Unsupported file type. Only JPEG, JPG, and PNG are allowed.',
-              HttpStatus.BAD_REQUEST,
-            ),
-            false,
-          );
-        }
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('coverImage', fileUploadConfig()))
   async createPlace(
     @Body() createTourismPlaceDto: CreateTourismPlaceDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    // Debug what we're receiving
+    console.log("Received create place request with data:", JSON.stringify(createTourismPlaceDto));
+    console.log("AdminId present:", !!createTourismPlaceDto.adminId);
+
     if (!file) {
       throw new HttpException(
         'Cover image is required',
@@ -65,6 +43,12 @@ export class TourismPlacesController {
     const cloudinaryUrl =
       await this.tourismPlacesService.uploadCoverImageToCloudinary(file.path);
 
+    // Add adminId if it's missing (temporary workaround)
+    if (!createTourismPlaceDto.adminId) {
+      console.log("Adding default adminId");
+      createTourismPlaceDto.adminId = "1";
+    }
+
     return this.tourismPlacesService.createPlace({
       ...createTourismPlaceDto,
       coverImage: cloudinaryUrl,
@@ -73,10 +57,19 @@ export class TourismPlacesController {
 
   // Update a tourism place
   @Patch('update/:id')
+  @UseInterceptors(FileInterceptor('coverImage', fileUploadConfig()))
   async updatePlace(
     @Param('id') id: string,
     @Body() updateTourismPlaceDto: UpdateTourismPlaceDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
+    // If a file is provided, upload it to Cloudinary and update the coverImage field
+    if (file) {
+      const cloudinaryUrl =
+        await this.tourismPlacesService.uploadCoverImageToCloudinary(file.path);
+      updateTourismPlaceDto.coverImage = cloudinaryUrl;
+    }
+
     return this.tourismPlacesService.updatePlace(
       parseInt(id),
       updateTourismPlaceDto,
@@ -85,32 +78,7 @@ export class TourismPlacesController {
 
   // Add multiple photos to a tourism place
   @Post(':id/photos')
-  @UseInterceptors(
-    FilesInterceptor('photos', 10, {
-      storage: diskStorage({
-        destination: './public/uploads/photos',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-        if (allowedMimeTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(
-            new HttpException(
-              'Unsupported file type. Only JPEG, JPG, and PNG are allowed.',
-              HttpStatus.BAD_REQUEST,
-            ),
-            false,
-          );
-        }
-      },
-    }),
-  )
+  @UseInterceptors(FilesInterceptor('photos', 10, fileUploadConfig()))
   async addPhotos(
     @Param('id') id: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
@@ -141,5 +109,11 @@ export class TourismPlacesController {
   @Get()
   async getAllPlaces() {
     return this.tourismPlacesService.getAllPlaces();
+  }
+
+  // Get a tourism place by ID
+  @Get(':id')
+  async getPlaceById(@Param('id') id: string) {
+    return this.tourismPlacesService.getPlaceById(parseInt(id));
   }
 }

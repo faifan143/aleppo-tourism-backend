@@ -1,183 +1,209 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
-import { execSync } from 'child_process';
+import { PrismaClient, PlaceCategory } from '@prisma/client';
+import * as bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Reset the database and apply migrations
-  resetDatabase();
+  console.log('Starting seed...');
 
-  // Seed the database
-  const { admin1, admin2 } = await createAdmins();
-  await createTourismPlaces();
-  await photosForTourismPlaces();
+  // Clean up existing data
+  await prisma.review.deleteMany({});
+  await prisma.event.deleteMany({});
+  await prisma.tourismPhoto.deleteMany({});
+  await prisma.tourismPlace.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.admin.deleteMany({});
 
-  function resetDatabase() {
-    try {
-      console.log('Resetting the database...');
-      execSync('npx prisma migrate reset --force --skip-seed');
-      console.log('Database reset and migrations applied successfully 🚀');
-    } catch (error) {
-      console.error('Error resetting the database:', error);
-      process.exit(1);
-    }
-  }
+  console.log('Database cleaned');
 
-  async function createAdmins() {
-    // Hash passwords
-    const hashedPassword1 = await bcrypt.hash('securepassword123', 10);
-    const hashedPassword2 = await bcrypt.hash('anothersecurepassword456', 10);
+  // Create default admin if it doesn't exist
+  const existingAdmin = await prisma.admin.findUnique({
+    where: { email: 'admin@example.com' }
+  });
 
-    // Create Admins
-    const admin1 = await prisma.admin.create({
+  if (!existingAdmin) {
+    const hashedPassword = await bcryptjs.hash('admin123', 10);
+
+    await prisma.admin.create({
       data: {
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        password: hashedPassword1,
-      },
+        name: 'Admin',
+        email: 'admin@example.com',
+        password: hashedPassword,
+      }
     });
 
-    const admin2 = await prisma.admin.create({
+    console.log('Created default admin: admin@example.com / admin123');
+  } else {
+    console.log('Default admin already exists');
+  }
+
+  // Create default user if it doesn't exist
+  const existingUser = await prisma.user.findUnique({
+    where: { email: 'user@example.com' }
+  });
+
+  if (!existingUser) {
+    const hashedPassword = await bcryptjs.hash('user123', 10);
+
+    await prisma.user.create({
       data: {
-        name: 'Jane Smith',
-        email: 'jane.smith@example.com',
-        password: hashedPassword2,
+        name: 'Test User',
+        email: 'user@example.com',
+        password: hashedPassword,
+      }
+    });
+
+    console.log('Created default user: user@example.com / user123');
+  } else {
+    console.log('Default user already exists');
+  }
+
+  // Create users
+  const userPassword = await bcryptjs.hash('user123', 10);
+
+  const user1 = await prisma.user.create({
+    data: {
+      name: 'John Doe',
+      email: 'john@example.com',
+      password: userPassword,
+    },
+  });
+
+  const user2 = await prisma.user.create({
+    data: {
+      name: 'Jane Smith',
+      email: 'jane@example.com',
+      password: userPassword,
+    },
+  });
+
+  console.log(`Created users with ids: ${user1.id}, ${user2.id}`);
+
+  // Create tourism places
+  const place1 = await prisma.tourismPlace.create({
+    data: {
+      name: 'الأهرامات',
+      description: 'أهرامات الجيزة، أحد عجائب الدنيا السبع، وهي من أقدم الآثار في العالم.',
+      category: PlaceCategory.ARCHAEOLOGICAL,
+      expectedPeakTime: 'Morning',
+      visitTimeRange: '8:00 AM - 5:00 PM',
+      latitude: 29.9792,
+      longitude: 31.1342,
+      coverImage: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/cover-images/pyramids.jpg',
+      adminId: existingAdmin.id,
+      photos: {
+        create: [
+          {
+            url: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/photos/pyramids1.jpg',
+          },
+          {
+            url: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/photos/pyramids2.jpg',
+          },
+        ],
       },
-    });
+    },
+  });
 
-    console.log('Admins Added Successfully 🚀');
+  const place2 = await prisma.tourismPlace.create({
+    data: {
+      name: 'مسجد محمد علي',
+      description: 'مسجد محمد علي باشا بقلعة صلاح الدين، أحد أشهر المعالم الإسلامية في مصر.',
+      category: PlaceCategory.RELIGIOUS,
+      expectedPeakTime: 'Afternoon',
+      visitTimeRange: '9:00 AM - 6:00 PM',
+      latitude: 30.0290,
+      longitude: 31.2599,
+      coverImage: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/cover-images/mosque.jpg',
+      adminId: existingAdmin.id,
+      photos: {
+        create: [
+          {
+            url: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/photos/mosque1.jpg',
+          },
+        ],
+      },
+    },
+  });
 
-    return { admin1, admin2 };
-  }
+  const place3 = await prisma.tourismPlace.create({
+    data: {
+      name: 'مطعم أبو طارق',
+      description: 'مطعم يقدم أشهى المأكولات المصرية التقليدية بأسعار معقولة.',
+      category: PlaceCategory.RESTAURANT,
+      expectedPeakTime: 'Evening',
+      visitTimeRange: '12:00 PM - 12:00 AM',
+      latitude: 30.0444,
+      longitude: 31.2357,
+      coverImage: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-places/cover-images/restaurant.jpg',
+      adminId: existingAdmin.id,
+    },
+  });
 
-  async function createTourismPlaces() {
-    const x = await prisma.tourismPlace.createMany({
-      data: [
-        {
-          name: 'قلعة حلب',
-          description:
-            'قلعة حلب هي قلعة تاريخية تقع في مدينة حلب، سوريا. تعتبر من أقدم وأكبر القلاع في العالم، وقد تم تشييدها على تل طبيعي يرتفع حوالي 50 متراً عن مستوى المدينة.',
-          latitude: 36.1981,
-          longitude: 37.1637,
-          coverImage:
-            'https://upload.wikimedia.org/wikipedia/commons/5/54/Citadel_of_Aleppo.jpg',
-          adminId: admin1.id,
-        },
-        {
-          name: 'جامع حلب الكبير',
-          description:
-            'الجامع الأموي الكبير في حلب هو أحد أكبر وأقدم المساجد في المدينة. يتميز بمئذنته الفريدة وزخارفه الإسلامية الرائعة.',
-          latitude: 36.1995,
-          longitude: 37.1553,
-          coverImage:
-            'https://lisa.gerda-henkel-stiftung.de/publikationen/aleppo/binaries/content/9735/1._great_mosque__courtyard__view_towards_northwest_syrian_he_1440x8001e64.jpg?t=1537022752',
-          adminId: admin1.id,
-        },
-        {
-          name: 'سوق المدينة',
-          description:
-            'أسواق حلب القديمة هي من أقدم وأطول الأسواق المسقوفة في العالم. تمتد لمسافة 13 كيلومتراً وتضم العديد من الخانات والأسواق التاريخية.',
-          latitude: 36.1987,
-          longitude: 37.1545,
-          coverImage:
-            'https://s.mc-doualiya.com/media/display/2539b76c-433b-11e9-bc4d-005056bff430/w:1280/p:1x1/aleppe_0.jpg',
-          adminId: admin1.id,
-        },
-        {
-          name: 'بيت أجقباش',
-          description:
-            'بيت أجقباش هو قصر تاريخي يعود للعصر العثماني، يتميز بزخارفه الجميلة وفنائه الداخلي وقاعاته المزينة.',
-          latitude: 36.1978,
-          longitude: 37.1567,
-          coverImage:
-            'https://live.staticflickr.com/6185/6077131343_870ba41799_b.jpg',
-          adminId: admin1.id,
-        },
-        {
-          name: 'باب قنسرين',
-          description:
-            'أحد أبواب حلب القديمة التاريخية، يعود تاريخه إلى العصر الأيوبي. يتميز بهندسته المعمارية الفريدة وأهميته التاريخية.',
-          latitude: 36.1923,
-          longitude: 37.1539,
-          coverImage:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSlFsJh-PyqT1g0GRxSN2em_amyJxolGRPD7w&s',
-          adminId: admin2.id,
-        },
-        {
-          name: 'خان الوزير',
-          description:
-            'خان تاريخي يعود للعصر العثماني، كان مركزاً تجارياً مهماً. يتميز بعمارته الإسلامية وفنائه الواسع وغرفه التجارية.',
-          latitude: 36.1989,
-          longitude: 37.1558,
-          coverImage:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPS2VSpyqtyBh-TDFg_eAo4kDnfwcb6uWG-w&s',
-          adminId: admin2.id,
-        },
-        {
-          name: 'بيت غزالة',
-          description:
-            'قصر تاريخي يعود للقرن السابع عشر، يعتبر نموذجاً رائعاً للعمارة السكنية في حلب القديمة. يتميز بزخارفه وإيوانه الجميل.',
-          latitude: 36.1976,
-          longitude: 37.1563,
-          coverImage:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRcRa4nebQ3YimvN-3C5kdojWGskRCwm8Y4PA&s',
-          adminId: admin2.id,
-        },
-        {
-          name: 'مدرسة الفردوس',
-          description:
-            'مدرسة تاريخية تعود للعصر الأيوبي، تتميز بعمارتها الإسلامية الفريدة وزخارفها وكتاباتها العربية الجميلة.',
-          latitude: 36.1957,
-          longitude: 37.1545,
-          coverImage: 'https://pbs.twimg.com/media/D-DVjq9XkAABrB4.jpg',
-          adminId: admin2.id,
-        },
-        {
-          name: 'حمام النحاسين',
-          description:
-            'حمام تقليدي يعود للعصر المملوكي، يعتبر من أجمل الحمامات التقليدية في حلب القديمة. يتميز بقبابه وزخارفه.',
-          latitude: 36.1984,
-          longitude: 37.1551,
-          coverImage:
-            'https://i0.wp.com/alsori.net/wp-content/uploads/2023/11/%D8%AA%D8%A7%D8%B1%D9%8A%D8%AE-%D8%AD%D9%85%D8%BA%D8%A7%D9%85-%D8%A7%D9%84%D9%86%D8%AD%D8%A7%D8%B3%D9%8A%D9%86.jpg?fit=640%2C640&ssl=1',
-          adminId: admin2.id,
-        },
-        {
-          name: 'بيت جنبلاط',
-          description:
-            'قصر تاريخي يعود للقرن الثامن عشر، يعتبر تحفة معمارية تجمع بين الطراز العثماني والعمارة الحلبية التقليدية.',
-          latitude: 36.1972,
-          longitude: 37.1559,
-          coverImage:
-            'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Junblatt_palace_Aleppo.jpg/640px-Junblatt_palace_Aleppo.jpg',
-          adminId: admin2.id,
-        },
-      ],
-    });
+  console.log(`Created tourism places with ids: ${place1.id}, ${place2.id}, ${place3.id}`);
 
-    console.log('تم إضافة الأماكن السياحية بنجاح 🚀');
-    return x;
-  }
+  // Create reviews
+  const review1 = await prisma.review.create({
+    data: {
+      content: 'مكان رائع، أنصح بزيارته.',
+      rating: 5,
+      userId: user1.id,
+      tourismPlaceId: place1.id,
+    },
+  });
 
-  async function photosForTourismPlaces() {
-    const tourismPlaces = await prisma.tourismPlace.findMany();
-    const photoUrls = [
-      'https://upload.wikimedia.org/wikipedia/commons/',
-      'https://upload.wikimedia.org/wikipedia/commons/',
-      'https://upload.wikimedia.org/wikipedia/commons/',
-    ];
-    const photoPromises = tourismPlaces.map((place) =>
-      prisma.tourismPhoto.createMany({
-        data: photoUrls.map((url, index) => ({
-          url: `${url}example_photo_${index + 1}.jpg`,
-          tourismPlaceId: place.id,
-        })),
-      }),
-    );
-    await Promise.all(photoPromises);
-    console.log('Photos Added Successfully 🚀');
-  }
+  const review2 = await prisma.review.create({
+    data: {
+      content: 'تجربة جيدة ولكن الزحام كان كثيراً.',
+      rating: 4,
+      userId: user2.id,
+      tourismPlaceId: place1.id,
+    },
+  });
+
+  const review3 = await prisma.review.create({
+    data: {
+      content: 'مكان مقدس وجميل.',
+      rating: 5,
+      userId: user1.id,
+      tourismPlaceId: place2.id,
+    },
+  });
+
+  console.log(`Created reviews with ids: ${review1.id}, ${review2.id}, ${review3.id}`);
+
+  // Create events
+  const now = new Date();
+  const nextWeek = new Date(now);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+
+  const nextMonth = new Date(now);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+  const event1 = await prisma.event.create({
+    data: {
+      name: 'مهرجان الشمس',
+      description: 'حدث سنوي يقام في الأهرامات حيث تشرق الشمس من بين الأهرامات.',
+      startDate: nextWeek,
+      endDate: new Date(nextWeek.getTime() + 24 * 60 * 60 * 1000), // Next day
+      tourismPlaceId: place1.id,
+      image: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-events/event1.jpg',
+    },
+  });
+
+  const event2 = await prisma.event.create({
+    data: {
+      name: 'معرض الفن الإسلامي',
+      description: 'معرض للفن الإسلامي في مسجد محمد علي.',
+      startDate: nextMonth,
+      endDate: new Date(nextMonth.getTime() + 7 * 24 * 60 * 60 * 1000), // Week long
+      tourismPlaceId: place2.id,
+      image: 'https://res.cloudinary.com/dkxuf7w3l/image/upload/v1625432896/tourism-events/event2.jpg',
+    },
+  });
+
+  console.log(`Created events with ids: ${event1.id}, ${event2.id}`);
+
+  console.log('Seeding complete!');
 }
 
 main()

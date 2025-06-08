@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PlaceCategory {
+  ARCHAEOLOGICAL 
+  RESTAURANT     
+  ENTERTAINMENT  
+  RELIGIOUS      
+  EDUCATIONAL    
+
+  @@map("place_categories")
+}
+
 model Admin {
   id        Int            @id @default(autoincrement())
   name      String
@@ -19,19 +29,36 @@ model Admin {
   @@map("admins")
 }
 
-model TourismPlace {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String
-  latitude    Float
-  longitude   Float
-  coverImage  String // URL of the main image
-  adminId     Int // Foreign key to Admin
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reviews   Review[] // One-to-many relation to Review
 
-  admin  Admin          @relation(fields: [adminId], references: [id]) // Relation to Admin
-  photos TourismPhoto[] // One-to-many relation to TourismPhoto
+  @@map("users")
+}
+
+model TourismPlace {
+  id              Int           @id @default(autoincrement())
+  name            String
+  description     String
+  category        PlaceCategory // Category of the tourism place
+  expectedPeakTime String        // Expected peak time (e.g., "Morning", "Afternoon", "Evening")
+  visitTimeRange  String?       // Optional visit time range (e.g., "9:00 AM - 5:00 PM")
+  latitude        Float
+  longitude       Float
+  coverImage      String        // URL of the main image
+  adminId         Int           // Foreign key to Admin
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  admin   Admin           @relation(fields: [adminId], references: [id]) // Relation to Admin
+  photos  TourismPhoto[]  // One-to-many relation to TourismPhoto
+  reviews Review[]        // One-to-many relation to Review
+  events  Event[]         // One-to-many relation to Event
 
   @@index([latitude, longitude]) // Index for geospatial queries
   @@map("tourism_places")
@@ -46,4 +73,35 @@ model TourismPhoto {
   tourismPlace TourismPlace @relation(fields: [tourismPlaceId], references: [id], onDelete: Cascade) // Cascade delete
 
   @@map("tourism_photos")
+}
+
+model Review {
+  id             Int      @id @default(autoincrement())
+  content        String   @db.Text
+  rating         Int      @db.Int
+  userId         Int      // Foreign key to User
+  tourismPlaceId Int      // Foreign key to TourismPlace
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tourismPlace TourismPlace @relation(fields: [tourismPlaceId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Event {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String   @db.Text
+  startDate      DateTime
+  endDate        DateTime
+  image          String?  // Optional URL for event image/poster
+  tourismPlaceId Int      // Foreign key to TourismPlace
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tourismPlace TourismPlace @relation(fields: [tourismPlaceId], references: [id], onDelete: Cascade)
+
+  @@map("events")
 }

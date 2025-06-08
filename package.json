@@ -6,7 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build && cp -r ./public ./dist",
+    "build": "nest build",
+    "postbuild": "node -e \"const fs=require('fs'); const path=require('path'); if(!fs.existsSync('dist/public')){fs.mkdirSync('dist/public', {recursive: true})}; if(fs.existsSync('public')){fs.readdirSync('public').forEach(file => {fs.copyFileSync(path.join('public', file), path.join('dist/public', file));});}\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

@@ -19,7 +19,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   @Get()
   async findAll() {
@@ -62,13 +62,18 @@ export class AdminController {
         password,
       );
 
+      // Set a cookie for server-side authentication
       res.cookie('access_token', accessToken, {
         httpOnly: true, // Makes the cookie inaccessible via JavaScript
         secure: false, // Set to true in production to ensure HTTPS
         // maxAge: 3600000, // 1 hour
       });
 
-      return res.status(HttpStatus.OK).json({ message: 'Login successful' });
+      // Also return the token in the response for client-side storage
+      return res.status(HttpStatus.OK).json({
+        message: 'Login successful',
+        token: accessToken
+      });
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.UNAUTHORIZED);
     }
